@@ -5,7 +5,7 @@ import HeatmapControls from "./components/HeatmapControls";
 import RouteCards from "./components/RouteCards";
 import RouteForm from "./components/RouteForm";
 import RouteMap from "./components/RouteMap";
-import { clientHeatmapHours, heatStats, hoursFromApi, thinRoutes } from "./risk";
+import { clientHeatmapHours, heatStats, hoursFromApi, paintRouteForHour, thinRoutes } from "./risk";
 import type { AnalyzeRequest, AnalyzeResponse, HeatCell } from "./types";
 
 export default function App() {
@@ -20,10 +20,11 @@ export default function App() {
   const [showChecks, setShowChecks] = useState(false);
   const heatReq = useRef(0);
 
-  const selectedRoute = useMemo(
-    () => data?.routes.find((r) => r.id === selectedId) ?? data?.routes[0] ?? null,
-    [data, selectedId]
-  );
+  const selectedRoute = useMemo(() => {
+    const raw = data?.routes.find((r) => r.id === selectedId) ?? data?.routes[0] ?? null;
+    if (!raw || !data) return null;
+    return paintRouteForHour(raw, heatByHour[hour] ?? [], data.weight_lb);
+  }, [data, selectedId, hour, heatByHour]);
 
   const recRoute = useMemo(
     () => data?.routes.find((r) => r.id === data.recommendation?.route_id) ?? null,

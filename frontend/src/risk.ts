@@ -1,4 +1,4 @@
-import type { HeatCell, RiskLevel, RouteOption } from "./types";
+import type { Checkpoint, HeatCell, RiskLevel, RouteOption } from "./types";
 
 const ORDER: RiskLevel[] = ["Low", "Moderate", "High", "Severe", "No Travel"];
 const SCORE: Record<RiskLevel, number> = {
@@ -164,4 +164,43 @@ export function heatStats(cells: HeatCell[]) {
 
 export function weatherStrength(c: HeatCell): number {
   return Math.min(1, Math.max(0, c.wind_mph / 28 + c.rain_in_hr * 2.2 + c.snow_in_hr * 0.6));
+}
+
+export function nearestCell(cells: HeatCell[], lat: number, lng: number): HeatCell | null {
+  if (!cells.length) return null;
+  let best = cells[0];
+  let bestD = Infinity;
+  for (const c of cells) {
+    const d = (c.lat - lat) ** 2 + (c.lng - lng) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+export function paintRouteForHour<T extends { checkpoints: Checkpoint[] }>(
+  route: T,
+  cells: HeatCell[],
+  weightLb: number
+): T {
+  if (!cells.length) return route;
+  return {
+    ...route,
+    checkpoints: route.checkpoints.map((cp) => {
+      const hit = nearestCell(cells, cp.lat, cp.lng);
+      if (!hit) return cp;
+      const { risk, score } = classifyWeather(hit.wind_mph, hit.rain_in_hr, hit.snow_in_hr, weightLb);
+      return {
+        ...cp,
+        wind_mph: hit.wind_mph,
+        rain_in_hr: hit.rain_in_hr,
+        snow_in_hr: hit.snow_in_hr,
+        forecast_time: hit.forecast_time,
+        risk,
+        risk_score: score,
+      };
+    }),
+  };
 }

@@ -13,8 +13,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import type { AnalyzeResponse, Checkpoint, HeatCell, RiskLevel, RouteOption } from "../types";
-import { RISK_COLORS, ROUTE_PALETTE } from "../riskColors";
-import { weatherStrength } from "../risk";
+import { RISK_COLORS, ROUTE_PALETTE, weatherTint } from "../riskColors";
+import { nearestCell, weatherStrength } from "../risk";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -46,24 +46,6 @@ interface Props {
   maxRisk: RiskLevel | string;
   heatLoading?: boolean;
   onSelect?: (id: number) => void;
-}
-
-function strengthColor(t: number): string {
-  const stops: [number, number, number, number][] = [
-    [0, 47, 158, 107],
-    [0.22, 201, 162, 39],
-    [0.45, 217, 119, 6],
-    [0.7, 194, 65, 12],
-    [1, 127, 29, 29],
-  ];
-  const x = Math.min(1, Math.max(0, t));
-  let i = 0;
-  while (i < stops.length - 2 && x > stops[i + 1][0]) i += 1;
-  const a = stops[i];
-  const b = stops[i + 1];
-  const u = (x - a[0]) / Math.max(b[0] - a[0], 0.0001);
-  const ch = (k: number) => Math.round(a[k] + (b[k] - a[k]) * u);
-  return `rgb(${ch(1)}, ${ch(2)}, ${ch(3)})`;
 }
 
 function HeatPane() {
@@ -125,7 +107,7 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
       {show &&
         cells.map((c, i) => {
           const t = weatherStrength(c);
-          const fill = strengthColor(t);
+          const fill = weatherTint(t);
           return (
             <CircleMarker
               key={`${c.lat}-${c.lng}-${i}-${c.forecast_time ?? ""}`}
@@ -158,28 +140,40 @@ function riskAtMile(checkpoints: Checkpoint[], mile: number) {
   return risk;
 }
 
-function riskChunks(route: RouteOption) {
+function pathColorAt(lat: number, lng: number, mile: number, route: RouteOption, cells: HeatCell[]) {
+  const hit = nearestCell(cells, lat, lng);
+  if (hit) {
+    const bucket = Math.round(weatherStrength(hit) * 8) / 8;
+    return weatherTint(bucket);
+  }
+  return RISK_COLORS[riskAtMile(route.checkpoints, mile)];
+}
+
+function riskChunks(route: RouteOption, cells: HeatCell[]) {
   const coords = route.coordinates;
   if (coords.length < 2) return [] as { positions: [number, number][]; color: string }[];
 
   const chunks: { positions: [number, number][]; color: string }[] = [];
-  let current = riskAtMile(route.checkpoints, 0);
+  let current = pathColorAt(coords[0][1], coords[0][0], 0, route, cells);
   let buffer: [number, number][] = [[coords[0][1], coords[0][0]]];
+  const step = Math.max(1, Math.floor(coords.length / 120));
 
-  for (let i = 1; i < coords.length; i++) {
+  for (let i = step; i < coords.length; i += step) {
     const mile = (i / (coords.length - 1)) * route.distance_miles;
-    const risk = riskAtMile(route.checkpoints, mile);
+    const color = pathColorAt(coords[i][1], coords[i][0], mile, route, cells);
     const pt: [number, number] = [coords[i][1], coords[i][0]];
-    if (risk !== current) {
+    if (color !== current) {
       buffer.push(pt);
-      chunks.push({ positions: buffer, color: RISK_COLORS[current] });
+      chunks.push({ positions: buffer, color: current });
       buffer = [pt];
-      current = risk;
+      current = color;
     } else {
       buffer.push(pt);
     }
   }
-  if (buffer.length > 1) chunks.push({ positions: buffer, color: RISK_COLORS[current] });
+  const last = coords[coords.length - 1];
+  buffer.push([last[1], last[0]]);
+  if (buffer.length > 1) chunks.push({ positions: buffer, color: current });
   return chunks;
 }
 
@@ -221,7 +215,7 @@ export default function RouteMap({
           const recommended = data.recommendation?.route_id === route.id;
           const outline = ROUTE_PALETTE[route.id % ROUTE_PALETTE.length];
           const full = route.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]);
-          const chunks = riskChunks(route);
+          const chunks = riskChunks(route, heatCells);
 
           return (
             <Fragment key={route.id}>
@@ -240,8 +234,8 @@ export default function RouteMap({
                   positions={chunk.positions}
                   pathOptions={{
                     color: chunk.color,
-                    weight: selected || recommended ? 6 : 3.5,
-                    opacity: selected || recommended ? 0.95 : 0.5,
+                    weight: selected || recommended ? 8 : 5,
+                    opacity: selected || recommended ? 1 : 0.7,
                   }}
                   eventHandlers={{ click: () => onSelect?.(route.id) }}
                 >
@@ -267,8 +261,10 @@ export default function RouteMap({
                   pathOptions={{
                     color: "#0b1220",
                     weight: 1,
-                    fillColor: RISK_COLORS[cp.risk],
-                    fillOpacity: 0.9,
+                    fillColor: nearestCell(heatCells, cp.lat, cp.lng)
+                      ? weatherTint(weatherStrength(nearestCell(heatCells, cp.lat, cp.lng)!))
+                      : RISK_COLORS[cp.risk],
+                    fillOpacity: 0.95,
                   }}
                 >
                   <Popup>
