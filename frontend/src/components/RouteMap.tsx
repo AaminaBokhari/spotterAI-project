@@ -140,27 +140,35 @@ function riskAtMile(checkpoints: Checkpoint[], mile: number) {
   return risk;
 }
 
-function pathColorAt(lat: number, lng: number, mile: number, route: RouteOption, cells: HeatCell[]) {
-  const hit = nearestCell(cells, lat, lng);
-  if (hit) {
-    const bucket = Math.round(weatherStrength(hit) * 8) / 8;
-    return weatherTint(bucket);
-  }
-  return RISK_COLORS[riskAtMile(route.checkpoints, mile)];
+function forecastTint(hour: number, weather = 0) {
+  return weatherTint(Math.min(1, hour / 36 + weather * 0.4));
 }
 
-function riskChunks(route: RouteOption, cells: HeatCell[]) {
+function pathColorAt(
+  lat: number,
+  lng: number,
+  mile: number,
+  route: RouteOption,
+  cells: HeatCell[],
+  hour: number
+) {
+  const hit = nearestCell(cells, lat, lng);
+  const weather = hit ? weatherStrength(hit) : riskAtMile(route.checkpoints, mile) === "Low" ? 0 : 0.3;
+  return forecastTint(hour, weather);
+}
+
+function riskChunks(route: RouteOption, cells: HeatCell[], hour: number) {
   const coords = route.coordinates;
   if (coords.length < 2) return [] as { positions: [number, number][]; color: string }[];
 
   const chunks: { positions: [number, number][]; color: string }[] = [];
-  let current = pathColorAt(coords[0][1], coords[0][0], 0, route, cells);
+  let current = pathColorAt(coords[0][1], coords[0][0], 0, route, cells, hour);
   let buffer: [number, number][] = [[coords[0][1], coords[0][0]]];
   const step = Math.max(1, Math.floor(coords.length / 120));
 
   for (let i = step; i < coords.length; i += step) {
     const mile = (i / (coords.length - 1)) * route.distance_miles;
-    const color = pathColorAt(coords[i][1], coords[i][0], mile, route, cells);
+    const color = pathColorAt(coords[i][1], coords[i][0], mile, route, cells, hour);
     const pt: [number, number] = [coords[i][1], coords[i][0]];
     if (color !== current) {
       buffer.push(pt);
@@ -215,11 +223,12 @@ export default function RouteMap({
           const recommended = data.recommendation?.route_id === route.id;
           const outline = ROUTE_PALETTE[route.id % ROUTE_PALETTE.length];
           const full = route.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]);
-          const chunks = riskChunks(route, heatCells);
+          const chunks = riskChunks(route, heatCells, hour);
 
           return (
             <Fragment key={route.id}>
               <Polyline
+                key={`${route.id}-outline-${hour}`}
                 positions={full}
                 pathOptions={{
                   color: outline,
@@ -230,7 +239,7 @@ export default function RouteMap({
               />
               {chunks.map((chunk, idx) => (
                 <Polyline
-                  key={`${route.id}-c-${idx}`}
+                  key={`${route.id}-h${hour}-c-${idx}`}
                   positions={chunk.positions}
                   pathOptions={{
                     color: chunk.color,
@@ -255,15 +264,18 @@ export default function RouteMap({
             .flatMap((route) =>
               route.checkpoints.map((cp, i) => (
                 <CircleMarker
-                  key={`${route.id}-${i}`}
+                  key={`${route.id}-${i}-h${hour}`}
                   center={[cp.lat, cp.lng]}
                   radius={selectedId === route.id ? 7 : 5}
                   pathOptions={{
                     color: "#0b1220",
                     weight: 1,
-                    fillColor: nearestCell(heatCells, cp.lat, cp.lng)
-                      ? weatherTint(weatherStrength(nearestCell(heatCells, cp.lat, cp.lng)!))
-                      : RISK_COLORS[cp.risk],
+                    fillColor: forecastTint(
+                      hour,
+                      nearestCell(heatCells, cp.lat, cp.lng)
+                        ? weatherStrength(nearestCell(heatCells, cp.lat, cp.lng)!)
+                        : 0
+                    ),
                     fillOpacity: 0.95,
                   }}
                 >
@@ -308,18 +320,16 @@ export default function RouteMap({
         <HeatLayer cells={heatCells} show={showHeat} />
       </MapContainer>
 
-      <div className="heat-hud">
+      <div className="heat-hud" style={{ borderColor: forecastTint(hour, 0.2) }}>
         <strong>{hour === 0 ? "Now" : `+${hour}h`}</strong>
         {heatLoading && !showHeat ? (
           <span>Loading corridor weather…</span>
-        ) : showHeat ? (
+        ) : (
           <>
             <span>{avgWind} mph wind</span>
             <span>{avgRain} in rain</span>
             <em>{maxRisk}</em>
           </>
-        ) : (
-          <span>Score a trip to load overlay</span>
         )}
       </div>
 

@@ -31,9 +31,7 @@ export default function HeatmapControls({
         <span>
           {loading
             ? "Loading 0–48h corridor forecast…"
-            : avgWind != null
-              ? `Avg wind ${avgWind} mph · max ${maxRisk ?? "Low"}`
-              : "0–48h forecast"}
+            : `Line color = this hour · avg wind ${avgWind ?? 0} mph · max ${maxRisk ?? "Low"}`}
           {forecastLabel && !loading
             ? ` · ${new Date(forecastLabel).toUTCString().replace("GMT", "UTC")}`
             : ""}
