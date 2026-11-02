@@ -8,3 +8,8 @@ whitenoise==6.12.0
 gunicorn
 whitenoise
 django-cors-headers
+   gunicorn
+   whitenoise
+   django-cors-headers
+   python-dotenv
+   djangorestframework
