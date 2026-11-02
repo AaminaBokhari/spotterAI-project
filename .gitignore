@@ -30,3 +30,9 @@ Thumbs.db
 !.env.example
 !backend/.env.example
 !frontend/.env.example
+
+venv/
+__pycache__/
+*.pyc
+.env
+node_modules/
