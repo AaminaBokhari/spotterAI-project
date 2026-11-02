@@ -29,12 +29,13 @@ export default function HeatmapControls({
           <strong>{hour === 0 ? "Now" : `+${hour} hours`}</strong>
         </div>
         <span>
-          {loading
-            ? "Loading 0–48h corridor forecast…"
-            : `Corridor at this hour · avg wind ${avgWind ?? 0} mph · max ${maxRisk ?? "Low"}`}
-          {forecastLabel && !loading
+          {hour === 0 ? "Showing Now" : `Showing +${hour}h`}
+          {forecastLabel
             ? ` · ${new Date(forecastLabel).toUTCString().replace("GMT", "UTC")}`
             : ""}
+          {loading
+            ? " · fetching corridor weather"
+            : ` · avg wind ${avgWind ?? 0} mph · max ${maxRisk ?? "Low"}`}
         </span>
       </div>
       <input
@@ -55,8 +56,16 @@ export default function HeatmapControls({
             type="button"
             className={hour === h ? "active" : ""}
             disabled={!enabled}
-            onPointerDown={() => onChange(h)}
-            onClick={() => onChange(h)}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(h);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(h);
+            }}
           >
             {h === 0 ? "Now" : `${h}h`}
           </button>
