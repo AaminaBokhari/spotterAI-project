@@ -93,11 +93,31 @@ python manage.py test routing
 - 45–54 mph + load > 30,000 lb → **No Travel**
 - 35–44 mph + load > 40,000 lb → at least **Severe**
 
-## Deploy notes
+## Deploy (hosted URL)
 
-1. **Backend**: Render / Railway / Fly — run Gunicorn (`gunicorn config.wsgi`), set `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=false`, `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
-2. **Frontend**: Netlify / Vercel / Cloudflare Pages — set `VITE_API_BASE` to the backend origin, then `npm run build`.
-3. Public OSRM / Nominatim are rate-limited; for production traffic use self-hosted or commercial endpoints.
+### Backend — Render
+1. Sign up at https://render.com with GitHub.
+2. **New → Web Service** → this repo.
+3. Root directory: `backend`
+4. Build: `pip install -r requirements.txt && python manage.py migrate`
+5. Start: `gunicorn config.wsgi:application`
+6. Environment:
+   - `DJANGO_SECRET_KEY` = any long random string
+   - `DJANGO_DEBUG` = `false`
+   - `DJANGO_ALLOWED_HOSTS` = `.onrender.com`
+   - `CORS_ALLOWED_ORIGINS` = your Vercel URL (add after frontend is live), e.g. `https://spotter-corridor.vercel.app`
+
+API health: `https://YOUR-SERVICE.onrender.com/api/health/`
+
+### Frontend — Vercel
+1. Sign up at https://vercel.com with GitHub.
+2. **Add New → Project** → this repo.
+3. Root directory: `frontend`
+4. Framework: Vite
+5. Environment: `VITE_API_URL` = `https://YOUR-SERVICE.onrender.com` (no trailing slash)
+6. Deploy, then put the Vercel URL into Render `CORS_ALLOWED_ORIGINS` and **Manual Deploy** the API once.
+
+Free Render apps sleep after idle; the first Analyze can take ~30–60s to wake.
 
 ## Loom walkthrough
 
