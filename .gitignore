@@ -1,0 +1,32 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+backend/venv/
+backend/db.sqlite3
+backend/staticfiles/
+backend/.env
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+npm-debug.log*
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Env
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
