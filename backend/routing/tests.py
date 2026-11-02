@@ -1,5 +1,6 @@
 from django.test import SimpleTestCase
 
+from routing.services.geocode import geocode
 from routing.services.recommend import recommend_route
 from routing.services.risk import (
     apply_load_rules,
@@ -112,3 +113,15 @@ class RecommendTests(SimpleTestCase):
         s = summarize_route_risk(cps)
         self.assertEqual(s["severe_miles"], 10)
         self.assertEqual(s["miles_by_risk"]["Low"], 20)
+
+
+class GeocodeTests(SimpleTestCase):
+    def test_known_demo_cities(self):
+        chi = geocode("Chicago, IL")
+        det = geocode("Detroit, MI")
+        self.assertAlmostEqual(chi["lat"], 41.8781, places=3)
+        self.assertAlmostEqual(det["lng"], -83.0458, places=3)
+
+    def test_lat_lng(self):
+        p = geocode("41.88, -87.63")
+        self.assertAlmostEqual(p["lat"], 41.88, places=2)
