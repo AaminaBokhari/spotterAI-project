@@ -146,8 +146,22 @@ export function hoursFromApi(raw: Record<string, HeatCell[]> | undefined, fallba
 }
 
 export function heatStats(cells: HeatCell[]) {
-  if (!cells.length) return { avgWind: 0, maxRisk: "Low" as RiskLevel };
-  const avgWind = cells.reduce((s, c) => s + c.wind_mph, 0) / cells.length;
+  if (!cells.length) {
+    return { avgWind: 0, avgRain: 0, avgSnow: 0, maxRisk: "Low" as RiskLevel };
+  }
+  const n = cells.length;
+  const avgWind = cells.reduce((s, c) => s + c.wind_mph, 0) / n;
+  const avgRain = cells.reduce((s, c) => s + c.rain_in_hr, 0) / n;
+  const avgSnow = cells.reduce((s, c) => s + c.snow_in_hr, 0) / n;
   const maxRisk = cells.reduce((best, c) => (SCORE[c.risk] > SCORE[best] ? c.risk : best), "Low" as RiskLevel);
-  return { avgWind: Math.round(avgWind * 10) / 10, maxRisk };
+  return {
+    avgWind: Math.round(avgWind * 10) / 10,
+    avgRain: Math.round(avgRain * 1000) / 1000,
+    avgSnow: Math.round(avgSnow * 1000) / 1000,
+    maxRisk,
+  };
+}
+
+export function weatherStrength(c: HeatCell): number {
+  return Math.min(1, Math.max(0, c.wind_mph / 28 + c.rain_in_hr * 2.2 + c.snow_in_hr * 0.6));
 }

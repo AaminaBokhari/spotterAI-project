@@ -12,8 +12,9 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
-import type { AnalyzeResponse, Checkpoint, HeatCell, RouteOption } from "../types";
+import type { AnalyzeResponse, Checkpoint, HeatCell, RiskLevel, RouteOption } from "../types";
 import { RISK_COLORS, ROUTE_PALETTE } from "../riskColors";
+import { weatherStrength } from "../risk";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -39,7 +40,42 @@ interface Props {
   selectedId: number | null;
   heatCells: HeatCell[];
   showHeat: boolean;
+  hour: number;
+  avgWind: number;
+  avgRain: number;
+  maxRisk: RiskLevel | string;
+  heatLoading?: boolean;
   onSelect?: (id: number) => void;
+}
+
+function strengthColor(t: number): string {
+  const stops: [number, number, number, number][] = [
+    [0, 47, 158, 107],
+    [0.22, 201, 162, 39],
+    [0.45, 217, 119, 6],
+    [0.7, 194, 65, 12],
+    [1, 127, 29, 29],
+  ];
+  const x = Math.min(1, Math.max(0, t));
+  let i = 0;
+  while (i < stops.length - 2 && x > stops[i + 1][0]) i += 1;
+  const a = stops[i];
+  const b = stops[i + 1];
+  const u = (x - a[0]) / Math.max(b[0] - a[0], 0.0001);
+  const ch = (k: number) => Math.round(a[k] + (b[k] - a[k]) * u);
+  return `rgb(${ch(1)}, ${ch(2)}, ${ch(3)})`;
+}
+
+function HeatPane() {
+  const map = useMap();
+  useEffect(() => {
+    if (!map.getPane("heatpane")) {
+      const pane = map.createPane("heatpane");
+      pane.style.zIndex = "450";
+      pane.style.pointerEvents = "none";
+    }
+  }, [map]);
+  return null;
 }
 
 function FitBounds({ routes }: { routes: RouteOption[] }) {
@@ -58,22 +94,24 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
   const map = useMap();
   useEffect(() => {
     if (!show || !cells.length) return;
+    const pane = map.getPane("heatpane") ? "heatpane" : undefined;
     const points: [number, number, number][] = cells.map((c) => [
       c.lat,
       c.lng,
-      Math.max(0.12, c.intensity),
+      Math.max(0.18, weatherStrength(c)),
     ]);
     const layer = (L as typeof L & { heatLayer: typeof L.heatLayer }).heatLayer(points, {
-      radius: 36,
-      blur: 18,
-      maxZoom: 10,
-      minOpacity: 0.35,
+      radius: 48,
+      blur: 22,
+      maxZoom: 9,
+      minOpacity: 0.55,
       max: 1,
+      pane,
       gradient: {
         0.0: "#2f9e6b",
-        0.25: "#c9a227",
-        0.5: "#d97706",
-        0.75: "#c2410c",
+        0.22: "#c9a227",
+        0.45: "#d97706",
+        0.7: "#c2410c",
         1.0: "#7f1d1d",
       },
     });
@@ -85,24 +123,28 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
   return (
     <>
       {show &&
-        cells.map((c, i) => (
-          <CircleMarker
-            key={`${c.lat}-${c.lng}-${i}`}
-            center={[c.lat, c.lng]}
-            radius={10 + c.intensity * 14}
-            pathOptions={{
-              color: RISK_COLORS[c.risk],
-              weight: 0,
-              fillColor: RISK_COLORS[c.risk],
-              fillOpacity: 0.22 + c.intensity * 0.45,
-            }}
-          >
-            <Tooltip>
-              {c.risk} · {c.wind_mph} mph
-              {c.forecast_time ? ` · ${c.forecast_time}` : ""}
-            </Tooltip>
-          </CircleMarker>
-        ))}
+        cells.map((c, i) => {
+          const t = weatherStrength(c);
+          const fill = strengthColor(t);
+          return (
+            <CircleMarker
+              key={`${c.lat}-${c.lng}-${i}-${c.forecast_time ?? ""}`}
+              center={[c.lat, c.lng]}
+              radius={16 + t * 22}
+              pane="heatpane"
+              pathOptions={{
+                color: fill,
+                weight: 0,
+                fillColor: fill,
+                fillOpacity: 0.45 + t * 0.4,
+              }}
+            >
+              <Tooltip>
+                {c.wind_mph} mph · rain {c.rain_in_hr} · {c.risk}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
     </>
   );
 }
@@ -141,7 +183,18 @@ function riskChunks(route: RouteOption) {
   return chunks;
 }
 
-export default function RouteMap({ data, selectedId, heatCells, showHeat, onSelect }: Props) {
+export default function RouteMap({
+  data,
+  selectedId,
+  heatCells,
+  showHeat,
+  hour,
+  avgWind,
+  avgRain,
+  maxRisk,
+  heatLoading,
+  onSelect,
+}: Props) {
   const center = useMemo<[number, number]>(() => {
     if (data?.origin) return [data.origin.lat, data.origin.lng];
     return [41.88, -87.63];
@@ -161,7 +214,7 @@ export default function RouteMap({ data, selectedId, heatCells, showHeat, onSele
         />
 
         {data && <FitBounds routes={data.routes} />}
-        <HeatLayer cells={heatCells} show={showHeat} />
+        <HeatPane />
 
         {data?.routes.map((route) => {
           const selected = selectedId === route.id;
@@ -255,7 +308,24 @@ export default function RouteMap({ data, selectedId, heatCells, showHeat, onSele
             </Marker>
           </>
         )}
+
+        <HeatLayer cells={heatCells} show={showHeat} />
       </MapContainer>
+
+      <div className="heat-hud">
+        <strong>{hour === 0 ? "Now" : `+${hour}h`}</strong>
+        {heatLoading && !showHeat ? (
+          <span>Loading corridor weather…</span>
+        ) : showHeat ? (
+          <>
+            <span>{avgWind} mph wind</span>
+            <span>{avgRain} in rain</span>
+            <em>{maxRisk}</em>
+          </>
+        ) : (
+          <span>Score a trip to load overlay</span>
+        )}
+      </div>
 
       <div className="map-legend">
         <span>Risk</span>

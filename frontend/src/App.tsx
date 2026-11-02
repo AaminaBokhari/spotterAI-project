@@ -165,6 +165,11 @@ export default function App() {
               selectedId={selectedId}
               heatCells={heatCells}
               showHeat={heatCells.length > 0}
+              hour={hour}
+              avgWind={stats.avgWind}
+              avgRain={stats.avgRain}
+              maxRisk={stats.maxRisk}
+              heatLoading={heatLoading}
               onSelect={setSelectedId}
             />
             {loading && (

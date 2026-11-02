@@ -180,6 +180,38 @@ select {
   background: #1a1c1e;
 }
 
+.heat-hud {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 500;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: baseline;
+  max-width: min(92%, 28rem);
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 106, 42, 0.45);
+  background: rgba(8, 8, 10, 0.92);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.heat-hud strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--accent);
+  min-width: 4.2rem;
+}
+
+.heat-hud em {
+  font-style: normal;
+  font-weight: 700;
+  color: #ffd7c2;
+}
+
 .map-legend {
   position: absolute;
   top: 0.75rem;
