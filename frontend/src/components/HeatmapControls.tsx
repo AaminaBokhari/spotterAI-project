@@ -44,6 +44,7 @@ export default function HeatmapControls({
         step={1}
         value={hour}
         disabled={!enabled}
+        onInput={(e) => onChange(Number((e.target as HTMLInputElement).value))}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="Forecast hour offset 0 to 48"
       />
@@ -54,6 +55,7 @@ export default function HeatmapControls({
             type="button"
             className={hour === h ? "active" : ""}
             disabled={!enabled}
+            onPointerDown={() => onChange(h)}
             onClick={() => onChange(h)}
           >
             {h === 0 ? "Now" : `${h}h`}

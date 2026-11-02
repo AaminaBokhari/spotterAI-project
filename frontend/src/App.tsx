@@ -5,7 +5,15 @@ import HeatmapControls from "./components/HeatmapControls";
 import RouteCards from "./components/RouteCards";
 import RouteForm from "./components/RouteForm";
 import RouteMap from "./components/RouteMap";
-import { clientHeatmapHours, heatStats, hoursFromApi, paintRouteForHour, thinRoutes } from "./risk";
+import {
+  cellsAtHour,
+  fetchCorridorForecast,
+  heatStats,
+  hoursFromApi,
+  paintRouteForHour,
+  thinRoutes,
+  type CorridorForecast,
+} from "./risk";
 import type { AnalyzeRequest, AnalyzeResponse, HeatCell } from "./types";
 
 export default function App() {
@@ -17,23 +25,27 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hour, setHour] = useState(0);
   const [heatByHour, setHeatByHour] = useState<Record<number, HeatCell[]>>({});
+  const [corridor, setCorridor] = useState<CorridorForecast[]>([]);
   const [showChecks, setShowChecks] = useState(false);
   const heatReq = useRef(0);
+
+  const heatCells = useMemo(() => {
+    if (corridor.length && data) return cellsAtHour(corridor, hour, data.weight_lb);
+    return heatByHour[hour] ?? [];
+  }, [corridor, hour, data, heatByHour]);
+  const forecastLabel = new Date(Date.now() + hour * 3600_000).toISOString();
+  const stats = heatStats(heatCells);
 
   const selectedRoute = useMemo(() => {
     const raw = data?.routes.find((r) => r.id === selectedId) ?? data?.routes[0] ?? null;
     if (!raw || !data) return null;
-    return paintRouteForHour(raw, heatByHour[hour] ?? heatByHour[Number(hour)] ?? [], data.weight_lb);
-  }, [data, selectedId, hour, heatByHour]);
+    return paintRouteForHour(raw, heatCells, data.weight_lb);
+  }, [data, selectedId, heatCells]);
 
   const recRoute = useMemo(
     () => data?.routes.find((r) => r.id === data.recommendation?.route_id) ?? null,
     [data]
   );
-
-  const heatCells = heatByHour[hour] ?? heatByHour[Number(hour)] ?? [];
-  const forecastLabel = heatCells[0]?.forecast_time ?? null;
-  const stats = heatStats(heatCells);
 
   const loadHeat = useCallback(async (payload: AnalyzeResponse) => {
     const reqId = ++heatReq.current;
@@ -42,9 +54,10 @@ export default function App() {
     const slim = thinRoutes(payload.routes);
     try {
       try {
-        const hours = await clientHeatmapHours(slim, payload.weight_lb);
+        const series = await fetchCorridorForecast(slim);
         if (reqId !== heatReq.current) return;
-        setHeatByHour(hours);
+        setCorridor(series);
+        setHeatByHour({});
       } catch {
         const res = await fetchHeatmap({
           weight_lb: payload.weight_lb,
@@ -77,6 +90,7 @@ export default function App() {
       setSelectedId(res.recommendation?.route_id ?? res.routes[0]?.id ?? null);
       setHour(0);
       setHeatByHour({});
+      setCorridor([]);
       setShowChecks(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

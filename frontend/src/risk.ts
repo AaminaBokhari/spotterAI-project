@@ -127,10 +127,18 @@ export function thinRoutes(routes: Pick<RouteOption, "coordinates">[]) {
   return routes.map((r) => ({ coordinates: thin(r.coordinates, 20) }));
 }
 
-export async function clientHeatmapHours(
-  routes: Pick<RouteOption, "coordinates">[],
-  weightLb: number
-): Promise<Record<number, HeatCell[]>> {
+export interface CorridorForecast {
+  lat: number;
+  lng: number;
+  times: string[];
+  wind: number[];
+  rain: number[];
+  snow: number[];
+}
+
+export async function fetchCorridorForecast(
+  routes: Pick<RouteOption, "coordinates">[]
+): Promise<CorridorForecast[]> {
   const pts = corridorPoints(routes).slice(0, 12);
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", pts.map((p) => p.lat.toFixed(4)).join(","));
@@ -144,33 +152,43 @@ export async function clientHeatmapHours(
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Weather forecast unavailable for heatmap");
   const payloads = parseMeteo(await res.json(), pts.length);
-  const now = Date.now();
 
-  const hours: Record<number, HeatCell[]> = {};
-  for (let h = 0; h <= 48; h++) hours[h] = [];
-
-  pts.forEach((pt, i) => {
+  return pts.map((pt, i) => {
     const hourly = payloads[i]?.hourly ?? payloads[0]?.hourly ?? {};
-    const times = hourly.time ?? [];
-    const wind = pickSeries(hourly.wind_speed_10m, 0);
-    const rain = pickSeries(hourly.precipitation, 0);
-    const snow = pickSeries(hourly.snowfall, 0);
-    for (let h = 0; h <= 48; h++) {
-      const idx = times.length ? closestIndex(times, now + h * 3600_000) : 0;
-      hours[h].push(
-        cell(
-          pt.lat,
-          pt.lng,
-          Number(wind[idx] || 0),
-          Number(rain[idx] || 0),
-          Number(snow[idx] || 0),
-          times[idx] ?? null,
-          weightLb
-        )
-      );
-    }
+    return {
+      lat: pt.lat,
+      lng: pt.lng,
+      times: hourly.time ?? [],
+      wind: pickSeries(hourly.wind_speed_10m, 0).map((v) => Number(v || 0)),
+      rain: pickSeries(hourly.precipitation, 0).map((v) => Number(v || 0)),
+      snow: pickSeries(hourly.snowfall, 0).map((v) => Number(v || 0)),
+    };
   });
+}
 
+export function cellsAtHour(forecast: CorridorForecast[], hour: number, weightLb: number): HeatCell[] {
+  const target = Date.now() + Math.max(0, Math.min(48, hour)) * 3600_000;
+  return forecast.map((pt) => {
+    const idx = pt.times.length ? closestIndex(pt.times, target) : 0;
+    return cell(
+      pt.lat,
+      pt.lng,
+      pt.wind[idx] || 0,
+      pt.rain[idx] || 0,
+      pt.snow[idx] || 0,
+      pt.times[idx] ?? new Date(target).toISOString(),
+      weightLb
+    );
+  });
+}
+
+export async function clientHeatmapHours(
+  routes: Pick<RouteOption, "coordinates">[],
+  weightLb: number
+): Promise<Record<number, HeatCell[]>> {
+  const forecast = await fetchCorridorForecast(routes);
+  const hours: Record<number, HeatCell[]> = {};
+  for (let h = 0; h <= 48; h++) hours[h] = cellsAtHour(forecast, h, weightLb);
   return hours;
 }
 
