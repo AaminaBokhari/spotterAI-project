@@ -72,7 +72,7 @@ function FitBounds({ routes }: { routes: RouteOption[] }) {
   return null;
 }
 
-function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
+function HeatLayer({ cells, show, hour }: { cells: HeatCell[]; show: boolean; hour: number }) {
   const map = useMap();
   useEffect(() => {
     if (!show || !cells.length) return;
@@ -101,7 +101,7 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
     return () => {
       map.removeLayer(layer);
     };
-  }, [map, cells, show]);
+  }, [map, cells, show, hour]);
   return null;
 }
 
@@ -187,7 +187,7 @@ export default function RouteMap({
 
         {data && <FitBounds routes={data.routes} />}
         <HeatPane />
-        <HeatLayer cells={heatCells} show={showHeat} />
+        <HeatLayer key={`heat-${hour}-${heatCells[0]?.forecast_time ?? "x"}`} cells={heatCells} show={showHeat} hour={hour} />
 
         {data?.routes.map((route) => {
           const selected = selectedId === route.id;

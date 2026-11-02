@@ -73,18 +73,54 @@ function corridorPoints(routes: Pick<RouteOption, "coordinates">[]) {
   return pts.slice(0, 24);
 }
 
-function closestNowIndex(times: string[]) {
-  const now = Date.now();
+function parseStamp(t: string): number {
+  const iso = t.endsWith("Z") || t.includes("+") ? t : `${t}Z`;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function closestIndex(times: string[], targetMs: number) {
   let best = 0;
   let diff = Infinity;
   times.forEach((t, i) => {
-    const d = Math.abs(new Date(t.endsWith("Z") || t.includes("+") ? t : `${t}Z`).getTime() - now);
+    const d = Math.abs(parseStamp(t) - targetMs);
     if (d < diff) {
       diff = d;
       best = i;
     }
   });
   return best;
+}
+
+function pickSeries(series: unknown, i: number): number[] {
+  if (!Array.isArray(series)) return [];
+  if (Array.isArray(series[0])) return (series[i] as number[]) ?? [];
+  return series as number[];
+}
+
+function parseMeteo(raw: unknown, count: number) {
+  if (Array.isArray(raw)) return raw.slice(0, count);
+  const o = raw as {
+    latitude?: number | number[];
+    hourly?: {
+      time?: string[];
+      wind_speed_10m?: number[] | number[][];
+      precipitation?: number[] | number[][];
+      snowfall?: number[] | number[][];
+    };
+  };
+  const hourly = o.hourly ?? {};
+  if (Array.isArray(o.latitude) && o.latitude.length > 1) {
+    return o.latitude.map((_, i) => ({
+      hourly: {
+        time: hourly.time ?? [],
+        wind_speed_10m: pickSeries(hourly.wind_speed_10m, i),
+        precipitation: pickSeries(hourly.precipitation, i),
+        snowfall: pickSeries(hourly.snowfall, i),
+      },
+    }));
+  }
+  return [o];
 }
 
 export function thinRoutes(routes: Pick<RouteOption, "coordinates">[]) {
@@ -95,7 +131,7 @@ export async function clientHeatmapHours(
   routes: Pick<RouteOption, "coordinates">[],
   weightLb: number
 ): Promise<Record<number, HeatCell[]>> {
-  const pts = corridorPoints(routes);
+  const pts = corridorPoints(routes).slice(0, 12);
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", pts.map((p) => p.lat.toFixed(4)).join(","));
   url.searchParams.set("longitude", pts.map((p) => p.lng.toFixed(4)).join(","));
@@ -107,24 +143,30 @@ export async function clientHeatmapHours(
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Weather forecast unavailable for heatmap");
-  const raw = await res.json();
-  const payloads: { hourly?: { time?: string[]; wind_speed_10m?: number[]; precipitation?: number[]; snowfall?: number[] } }[] =
-    Array.isArray(raw) ? raw : [raw];
+  const payloads = parseMeteo(await res.json(), pts.length);
+  const now = Date.now();
 
   const hours: Record<number, HeatCell[]> = {};
   for (let h = 0; h <= 48; h++) hours[h] = [];
 
   pts.forEach((pt, i) => {
-    const hourly = payloads[i]?.hourly ?? {};
+    const hourly = payloads[i]?.hourly ?? payloads[0]?.hourly ?? {};
     const times = hourly.time ?? [];
-    const wind = hourly.wind_speed_10m ?? [];
-    const rain = hourly.precipitation ?? [];
-    const snow = hourly.snowfall ?? [];
-    const base = times.length ? closestNowIndex(times) : 0;
+    const wind = pickSeries(hourly.wind_speed_10m, 0);
+    const rain = pickSeries(hourly.precipitation, 0);
+    const snow = pickSeries(hourly.snowfall, 0);
     for (let h = 0; h <= 48; h++) {
-      const idx = Math.min(base + h, Math.max(times.length - 1, 0));
+      const idx = times.length ? closestIndex(times, now + h * 3600_000) : 0;
       hours[h].push(
-        cell(pt.lat, pt.lng, Number(wind[idx] || 0), Number(rain[idx] || 0), Number(snow[idx] || 0), times[idx] ?? null, weightLb)
+        cell(
+          pt.lat,
+          pt.lng,
+          Number(wind[idx] || 0),
+          Number(rain[idx] || 0),
+          Number(snow[idx] || 0),
+          times[idx] ?? null,
+          weightLb
+        )
       );
     }
   });

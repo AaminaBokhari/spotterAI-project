@@ -23,7 +23,7 @@ export default function App() {
   const selectedRoute = useMemo(() => {
     const raw = data?.routes.find((r) => r.id === selectedId) ?? data?.routes[0] ?? null;
     if (!raw || !data) return null;
-    return paintRouteForHour(raw, heatByHour[hour] ?? [], data.weight_lb);
+    return paintRouteForHour(raw, heatByHour[hour] ?? heatByHour[Number(hour)] ?? [], data.weight_lb);
   }, [data, selectedId, hour, heatByHour]);
 
   const recRoute = useMemo(
@@ -31,7 +31,7 @@ export default function App() {
     [data]
   );
 
-  const heatCells = heatByHour[hour] ?? [];
+  const heatCells = heatByHour[hour] ?? heatByHour[Number(hour)] ?? [];
   const forecastLabel = heatCells[0]?.forecast_time ?? null;
   const stats = heatStats(heatCells);
 
