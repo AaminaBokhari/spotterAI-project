@@ -5,9 +5,8 @@ import HeatmapControls from "./components/HeatmapControls";
 import RouteCards from "./components/RouteCards";
 import RouteForm from "./components/RouteForm";
 import RouteMap from "./components/RouteMap";
+import { clientHeatmapHours, heatStats, hoursFromApi, thinRoutes } from "./risk";
 import type { AnalyzeRequest, AnalyzeResponse, HeatCell } from "./types";
-
-const heatCache = new Map<string, HeatCell[]>();
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -17,7 +16,7 @@ export default function App() {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hour, setHour] = useState(0);
-  const [heatCells, setHeatCells] = useState<HeatCell[]>([]);
+  const [heatByHour, setHeatByHour] = useState<Record<number, HeatCell[]>>({});
   const [showChecks, setShowChecks] = useState(false);
   const heatReq = useRef(0);
 
@@ -31,28 +30,30 @@ export default function App() {
     [data]
   );
 
+  const heatCells = heatByHour[hour] ?? [];
   const forecastLabel = heatCells[0]?.forecast_time ?? null;
+  const stats = heatStats(heatCells);
 
-  const loadHeat = useCallback(async (payload: AnalyzeResponse, hourOffset: number) => {
-    const key = `${payload.origin.lat},${payload.origin.lng}->${payload.destination.lat},${payload.destination.lng}:${payload.weight_lb}:${hourOffset}`;
-    if (heatCache.has(key)) {
-      setHeatCells(heatCache.get(key)!);
-      setHeatError(null);
-      return;
-    }
+  const loadHeat = useCallback(async (payload: AnalyzeResponse) => {
     const reqId = ++heatReq.current;
     setHeatLoading(true);
     setHeatError(null);
+    const slim = thinRoutes(payload.routes);
     try {
-      const res = await fetchHeatmap({
-        weight_lb: payload.weight_lb,
-        hour_offset: hourOffset,
-        routes: payload.routes.map((r) => ({ coordinates: r.coordinates })),
-        grid: 8,
-      });
-      if (reqId !== heatReq.current) return;
-      heatCache.set(key, res.cells);
-      setHeatCells(res.cells);
+      try {
+        const hours = await clientHeatmapHours(slim, payload.weight_lb);
+        if (reqId !== heatReq.current) return;
+        setHeatByHour(hours);
+      } catch {
+        const res = await fetchHeatmap({
+          weight_lb: payload.weight_lb,
+          hour_offset: 0,
+          routes: slim,
+          grid: 7,
+        });
+        if (reqId !== heatReq.current) return;
+        setHeatByHour(hoursFromApi(res.hours, res.cells, 0));
+      }
     } catch (err) {
       if (reqId !== heatReq.current) return;
       setHeatError(err instanceof Error ? err.message : "Heatmap failed to load");
@@ -63,11 +64,8 @@ export default function App() {
 
   useEffect(() => {
     if (!data) return;
-    const t = window.setTimeout(() => {
-      void loadHeat(data, hour);
-    }, 280);
-    return () => window.clearTimeout(t);
-  }, [data, hour, loadHeat]);
+    void loadHeat(data);
+  }, [data, loadHeat]);
 
   async function handleAnalyze(payload: AnalyzeRequest) {
     setLoading(true);
@@ -77,8 +75,7 @@ export default function App() {
       setData(res);
       setSelectedId(res.recommendation?.route_id ?? res.routes[0]?.id ?? null);
       setHour(0);
-      heatCache.clear();
-      setHeatCells([]);
+      setHeatByHour({});
       setShowChecks(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -188,6 +185,8 @@ export default function App() {
               loading={heatLoading}
               enabled={!!data}
               forecastLabel={forecastLabel}
+              avgWind={stats.avgWind}
+              maxRisk={stats.maxRisk}
               error={heatError}
             />
             {selectedRoute && (

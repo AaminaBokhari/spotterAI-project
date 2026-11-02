@@ -4,6 +4,8 @@ interface Props {
   loading: boolean;
   enabled: boolean;
   forecastLabel?: string | null;
+  avgWind?: number;
+  maxRisk?: string;
   error?: string | null;
 }
 
@@ -15,6 +17,8 @@ export default function HeatmapControls({
   loading,
   enabled,
   forecastLabel,
+  avgWind,
+  maxRisk,
   error,
 }: Props) {
   return (
@@ -25,8 +29,14 @@ export default function HeatmapControls({
           <strong>{hour === 0 ? "Now" : `+${hour} hours`}</strong>
         </div>
         <span>
-          {forecastLabel ? new Date(forecastLabel).toUTCString().replace("GMT", "UTC") : "0–48h forecast"}
-          {loading ? " · updating" : ""}
+          {loading
+            ? "Loading 0–48h corridor forecast…"
+            : avgWind != null
+              ? `Avg wind ${avgWind} mph · max ${maxRisk ?? "Low"}`
+              : "0–48h forecast"}
+          {forecastLabel && !loading
+            ? ` · ${new Date(forecastLabel).toUTCString().replace("GMT", "UTC")}`
+            : ""}
         </span>
       </div>
       <input

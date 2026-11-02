@@ -22,13 +22,28 @@ def _bounds_from_routes(routes: list[dict], pad: float = 0.35) -> tuple[float, f
     )
 
 
+def _cell(pt: dict, wx: dict, weight_lb: float) -> dict:
+    risk = classify_weather(wx["wind_mph"], wx["rain_in_hr"], wx["snow_in_hr"], weight_lb)
+    # Mix band + wind so calm vs breezy hours still look different on the map.
+    intensity = min(1.0, risk["risk_score"] / 4.0 + min(wx["wind_mph"], 40) / 80)
+    return {
+        "lat": round(pt["lat"], 4),
+        "lng": round(pt["lng"], 4),
+        "intensity": round(intensity, 3),
+        "risk": risk["risk"],
+        "wind_mph": wx["wind_mph"],
+        "rain_in_hr": wx["rain_in_hr"],
+        "snow_in_hr": wx["snow_in_hr"],
+        "forecast_time": wx["forecast_time"],
+    }
+
+
 def build_heatmap(routes: list[dict], weight_lb: float, hour_offset: int = 0, grid: int = 12) -> dict:
-    """Return GeoJSON-ish points with risk intensity for the forecast hour."""
+    """Return corridor cells for every hour 0–48 from one weather pull."""
     hour_offset = max(0, min(48, int(hour_offset)))
     min_lat, max_lat, min_lng, max_lng = _bounds_from_routes(routes)
 
-    # Cap density for performance / free weather rate limits
-    grid = max(5, min(int(grid), 8))
+    grid = max(5, min(int(grid), 7))
     points = []
     for i in range(grid):
         lat = min_lat + (max_lat - min_lat) * (i / max(grid - 1, 1))
@@ -37,22 +52,9 @@ def build_heatmap(routes: list[dict], weight_lb: float, hour_offset: int = 0, gr
             points.append({"lat": lat, "lng": lng})
 
     payloads = fetch_hourly_for_points(points)
-    cells = []
-    for pt, payload in zip(points, payloads):
-        wx = weather_at_hour_offset(payload, hour_offset)
-        risk = classify_weather(wx["wind_mph"], wx["rain_in_hr"], wx["snow_in_hr"], weight_lb)
-        cells.append(
-            {
-                "lat": round(pt["lat"], 4),
-                "lng": round(pt["lng"], 4),
-                "intensity": risk["risk_score"] / 4.0,
-                "risk": risk["risk"],
-                "wind_mph": wx["wind_mph"],
-                "rain_in_hr": wx["rain_in_hr"],
-                "snow_in_hr": wx["snow_in_hr"],
-                "forecast_time": wx["forecast_time"],
-            }
-        )
+    hours: dict[str, list] = {}
+    for h in range(0, 49):
+        hours[str(h)] = [_cell(pt, weather_at_hour_offset(payload, h), weight_lb) for pt, payload in zip(points, payloads)]
 
     return {
         "hour_offset": hour_offset,
@@ -62,6 +64,7 @@ def build_heatmap(routes: list[dict], weight_lb: float, hour_offset: int = 0, gr
             "min_lng": min_lng,
             "max_lng": max_lng,
         },
-        "cells": cells,
+        "cells": hours[str(hour_offset)],
+        "hours": hours,
         "legend": list(RISK_SCORE.keys()),
     }

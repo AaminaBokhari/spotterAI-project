@@ -61,12 +61,13 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
     const points: [number, number, number][] = cells.map((c) => [
       c.lat,
       c.lng,
-      Math.max(0.15, c.intensity),
+      Math.max(0.12, c.intensity),
     ]);
     const layer = (L as typeof L & { heatLayer: typeof L.heatLayer }).heatLayer(points, {
-      radius: 28,
-      blur: 22,
+      radius: 36,
+      blur: 18,
       maxZoom: 10,
+      minOpacity: 0.35,
       max: 1,
       gradient: {
         0.0: "#2f9e6b",
@@ -81,7 +82,29 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
       map.removeLayer(layer);
     };
   }, [map, cells, show]);
-  return null;
+  return (
+    <>
+      {show &&
+        cells.map((c, i) => (
+          <CircleMarker
+            key={`${c.lat}-${c.lng}-${i}`}
+            center={[c.lat, c.lng]}
+            radius={10 + c.intensity * 14}
+            pathOptions={{
+              color: RISK_COLORS[c.risk],
+              weight: 0,
+              fillColor: RISK_COLORS[c.risk],
+              fillOpacity: 0.22 + c.intensity * 0.45,
+            }}
+          >
+            <Tooltip>
+              {c.risk} · {c.wind_mph} mph
+              {c.forecast_time ? ` · ${c.forecast_time}` : ""}
+            </Tooltip>
+          </CircleMarker>
+        ))}
+    </>
+  );
 }
 
 function riskAtMile(checkpoints: Checkpoint[], mile: number) {

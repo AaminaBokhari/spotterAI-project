@@ -71,6 +71,7 @@ export interface HeatmapResponse {
     max_lng: number;
   };
   cells: HeatCell[];
+  hours?: Record<string, HeatCell[]>;
   legend: string[];
 }
 
