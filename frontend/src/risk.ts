@@ -33,30 +33,12 @@ function thin(coords: [number, number][], maxPts = 16): [number, number][] {
   return Array.from({ length: maxPts }, (_, i) => coords[Math.round(i * step)]);
 }
 
-function bounds(routes: Pick<RouteOption, "coordinates">[]) {
-  const lngs: number[] = [];
-  const lats: number[] = [];
-  for (const r of routes) {
-    for (const [lng, lat] of thin(r.coordinates)) {
-      lngs.push(lng);
-      lats.push(lat);
-    }
-  }
-  const pad = 0.35;
-  return {
-    min_lat: Math.min(...lats) - pad,
-    max_lat: Math.max(...lats) + pad,
-    min_lng: Math.min(...lngs) - pad,
-    max_lng: Math.max(...lngs) + pad,
-  };
-}
-
 function cell(lat: number, lng: number, wind: number, rain: number, snow: number, time: string | null, weight: number): HeatCell {
   const { risk, score } = classifyWeather(wind, rain, snow, weight);
   return {
     lat: Number(lat.toFixed(4)),
     lng: Number(lng.toFixed(4)),
-    intensity: Math.min(1, score / 4 + Math.min(wind, 40) / 80),
+    intensity: Math.min(1, score / 4 + Math.min(wind, 45) / 90),
     risk,
     wind_mph: Math.round(wind * 100) / 100,
     rain_in_hr: Math.round(rain * 1000) / 1000,
@@ -65,16 +47,30 @@ function cell(lat: number, lng: number, wind: number, rain: number, snow: number
   };
 }
 
-function gridPoints(b: ReturnType<typeof bounds>, n = 6) {
+function corridorPoints(routes: Pick<RouteOption, "coordinates">[]) {
   const pts: { lat: number; lng: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const lat = b.min_lat + ((b.max_lat - b.min_lat) * i) / Math.max(n - 1, 1);
-    for (let j = 0; j < n; j++) {
-      const lng = b.min_lng + ((b.max_lng - b.min_lng) * j) / Math.max(n - 1, 1);
-      pts.push({ lat, lng });
+  const seen = new Set<string>();
+  const add = (lat: number, lng: number) => {
+    const k = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    pts.push({ lat, lng });
+  };
+  for (const r of routes) {
+    const coords = thin(r.coordinates, 14);
+    for (let i = 0; i < coords.length; i++) {
+      const [lng, lat] = coords[i];
+      add(lat, lng);
+      const next = coords[Math.min(i + 1, coords.length - 1)];
+      const dx = next[0] - lng;
+      const dy = next[1] - lat;
+      const len = Math.hypot(dx, dy) || 1;
+      const off = 0.12;
+      add(lat + (-dx / len) * off, lng + (dy / len) * off);
+      add(lat - (-dx / len) * off, lng - (dy / len) * off);
     }
   }
-  return pts;
+  return pts.slice(0, 24);
 }
 
 function closestNowIndex(times: string[]) {
@@ -99,7 +95,7 @@ export async function clientHeatmapHours(
   routes: Pick<RouteOption, "coordinates">[],
   weightLb: number
 ): Promise<Record<number, HeatCell[]>> {
-  const pts = gridPoints(bounds(routes), 6);
+  const pts = corridorPoints(routes);
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", pts.map((p) => p.lat.toFixed(4)).join(","));
   url.searchParams.set("longitude", pts.map((p) => p.lng.toFixed(4)).join(","));
@@ -163,7 +159,7 @@ export function heatStats(cells: HeatCell[]) {
 }
 
 export function weatherStrength(c: HeatCell): number {
-  return Math.min(1, Math.max(0, c.wind_mph / 28 + c.rain_in_hr * 2.2 + c.snow_in_hr * 0.6));
+  return Math.min(1, Math.max(0, c.intensity));
 }
 
 export function nearestCell(cells: HeatCell[], lat: number, lng: number): HeatCell | null {

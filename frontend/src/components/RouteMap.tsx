@@ -13,8 +13,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import type { AnalyzeResponse, Checkpoint, HeatCell, RiskLevel, RouteOption } from "../types";
-import { RISK_COLORS, ROUTE_PALETTE, weatherTint } from "../riskColors";
-import { nearestCell, weatherStrength } from "../risk";
+import { RISK_COLORS, ROUTE_PALETTE } from "../riskColors";
+import { nearestCell } from "../risk";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -53,7 +53,7 @@ function HeatPane() {
   useEffect(() => {
     if (!map.getPane("heatpane")) {
       const pane = map.createPane("heatpane");
-      pane.style.zIndex = "450";
+      pane.style.zIndex = "350";
       pane.style.pointerEvents = "none";
     }
   }, [map]);
@@ -79,19 +79,19 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
     const points: [number, number, number][] = cells.map((c) => [
       c.lat,
       c.lng,
-      Math.max(0.18, weatherStrength(c)),
+      Math.max(0.08, Math.min(1, c.intensity)),
     ]);
     const layer = (L as typeof L & { heatLayer: typeof L.heatLayer }).heatLayer(points, {
-      radius: 48,
-      blur: 22,
-      maxZoom: 9,
-      minOpacity: 0.55,
+      radius: 28,
+      blur: 32,
+      maxZoom: 8,
+      minOpacity: 0.18,
       max: 1,
       gradient: {
         0.0: "#2f9e6b",
-        0.22: "#c9a227",
-        0.45: "#d97706",
-        0.7: "#c2410c",
+        0.35: "#c9a227",
+        0.55: "#d97706",
+        0.75: "#c2410c",
         1.0: "#7f1d1d",
       },
     });
@@ -102,33 +102,7 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
       map.removeLayer(layer);
     };
   }, [map, cells, show]);
-  return (
-    <>
-      {show &&
-        cells.map((c, i) => {
-          const t = weatherStrength(c);
-          const fill = weatherTint(t);
-          return (
-            <CircleMarker
-              key={`${c.lat}-${c.lng}-${i}-${c.forecast_time ?? ""}`}
-              center={[c.lat, c.lng]}
-              radius={16 + t * 22}
-              pane="heatpane"
-              pathOptions={{
-                color: fill,
-                weight: 0,
-                fillColor: fill,
-                fillOpacity: 0.45 + t * 0.4,
-              }}
-            >
-              <Tooltip>
-                {c.wind_mph} mph · rain {c.rain_in_hr} · {c.risk}
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-    </>
-  );
+  return null;
 }
 
 function riskAtMile(checkpoints: Checkpoint[], mile: number) {
@@ -140,21 +114,17 @@ function riskAtMile(checkpoints: Checkpoint[], mile: number) {
   return risk;
 }
 
-function forecastTint(hour: number, weather = 0) {
-  return weatherTint(Math.min(1, hour / 36 + weather * 0.4));
-}
-
 function pathColorAt(
   lat: number,
   lng: number,
   mile: number,
   route: RouteOption,
   cells: HeatCell[],
-  hour: number
+  _hour: number
 ) {
   const hit = nearestCell(cells, lat, lng);
-  const weather = hit ? weatherStrength(hit) : riskAtMile(route.checkpoints, mile) === "Low" ? 0 : 0.3;
-  return forecastTint(hour, weather);
+  if (hit) return RISK_COLORS[hit.risk];
+  return RISK_COLORS[riskAtMile(route.checkpoints, mile)];
 }
 
 function riskChunks(route: RouteOption, cells: HeatCell[], hour: number) {
@@ -217,6 +187,7 @@ export default function RouteMap({
 
         {data && <FitBounds routes={data.routes} />}
         <HeatPane />
+        <HeatLayer cells={heatCells} show={showHeat} />
 
         {data?.routes.map((route) => {
           const selected = selectedId === route.id;
@@ -270,12 +241,9 @@ export default function RouteMap({
                   pathOptions={{
                     color: "#0b1220",
                     weight: 1,
-                    fillColor: forecastTint(
-                      hour,
-                      nearestCell(heatCells, cp.lat, cp.lng)
-                        ? weatherStrength(nearestCell(heatCells, cp.lat, cp.lng)!)
-                        : 0
-                    ),
+                    fillColor: RISK_COLORS[
+                      nearestCell(heatCells, cp.lat, cp.lng)?.risk ?? cp.risk
+                    ],
                     fillOpacity: 0.95,
                   }}
                 >
@@ -317,10 +285,9 @@ export default function RouteMap({
           </>
         )}
 
-        <HeatLayer cells={heatCells} show={showHeat} />
       </MapContainer>
 
-      <div className="heat-hud" style={{ borderColor: forecastTint(hour, 0.2) }}>
+      <div className="heat-hud">
         <strong>{hour === 0 ? "Now" : `+${hour}h`}</strong>
         {heatLoading && !showHeat ? (
           <span>Loading corridor weather…</span>
