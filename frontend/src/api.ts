@@ -12,7 +12,7 @@ function explain(err: unknown): Error {
   return err instanceof Error ? err : new Error("Request failed");
 }
 
-async function postOnce<T>(path: string, body: unknown, timeoutMs: number, signal: AbortSignal): Promise<T> {
+async function postOnce<T>(path: string, body: unknown, _timeoutMs: number, signal: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

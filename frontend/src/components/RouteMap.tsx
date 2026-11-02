@@ -76,7 +76,6 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
   const map = useMap();
   useEffect(() => {
     if (!show || !cells.length) return;
-    const pane = map.getPane("heatpane") ? "heatpane" : undefined;
     const points: [number, number, number][] = cells.map((c) => [
       c.lat,
       c.lng,
@@ -88,7 +87,6 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
       maxZoom: 9,
       minOpacity: 0.55,
       max: 1,
-      pane,
       gradient: {
         0.0: "#2f9e6b",
         0.22: "#c9a227",
@@ -97,6 +95,8 @@ function HeatLayer({ cells, show }: { cells: HeatCell[]; show: boolean }) {
         1.0: "#7f1d1d",
       },
     });
+    const heatPane = map.getPane("heatpane");
+    if (heatPane) (layer as L.Layer).options.pane = "heatpane";
     layer.addTo(map);
     return () => {
       map.removeLayer(layer);
