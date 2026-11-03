@@ -131,6 +131,12 @@ export default function App() {
         <aside className="rail">
           <RouteForm loading={loading} onSubmit={handleAnalyze} compact={!!data} />
           {error && <p className="error-banner">{error}</p>}
+          {data?.demo_weather && (
+            <p className="demo-banner">
+              DEMO SCENARIO — winds set to 28 / 40 / 50 mph on routes 1–3 so load rules show.
+              Not live NWS. Route 1 Moderate, Route 2 Severe at 41k lb, Route 3 No Travel.
+            </p>
+          )}
           {data ? (
             <>
               {recRoute && data.recommendation && (
@@ -165,7 +171,7 @@ export default function App() {
                 fewest severe miles, then high, then average risk, then time.
               </p>
               <ul>
-                <li>3 OSRM driving options</li>
+                <li>Up to 3 OSRM drives, plus a via-point if OSRM only returns 2</li>
                 <li>Forecast at every 10 / 25 / 50 mi ETA</li>
                 <li>Wind + rain + snow + load rules</li>
               </ul>

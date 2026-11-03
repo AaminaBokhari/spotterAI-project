@@ -49,6 +49,7 @@ export interface AnalyzeResponse {
   departure_time: string;
   routes: RouteOption[];
   recommendation: { route_id: number; reason: string } | null;
+  demo_weather?: boolean;
 }
 
 export interface HeatCell {
@@ -81,4 +82,5 @@ export interface AnalyzeRequest {
   departure_time: string;
   weight_lb: number;
   interval_miles?: number | null;
+  demo_weather?: boolean;
 }

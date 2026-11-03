@@ -26,15 +26,37 @@ export default function RouteForm({ loading, compact, onSubmit }: Props) {
   const weightNum = useMemo(() => Number(weight), [weight]);
   const collapsed = compact && !open;
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!origin.trim() || !destination.trim() || !departure || !(weightNum > 0)) return;
-    onSubmit({
+  function payload(extra: Partial<AnalyzeRequest> = {}): AnalyzeRequest | null {
+    if (!origin.trim() || !destination.trim() || !departure || !(weightNum > 0)) return null;
+    return {
       origin: origin.trim(),
       destination: destination.trim(),
       departure_time: new Date(departure).toISOString(),
       weight_lb: weightNum,
       interval_miles: interval === "auto" ? null : Number(interval),
+      ...extra,
+    };
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const body = payload();
+    if (!body) return;
+    onSubmit(body);
+    if (compact) setOpen(false);
+  }
+
+  function runHighWindDemo() {
+    setOrigin("Chicago, IL");
+    setDestination("Detroit, MI");
+    setWeight("41000");
+    onSubmit({
+      origin: "Chicago, IL",
+      destination: "Detroit, MI",
+      departure_time: new Date(departure).toISOString(),
+      weight_lb: 41000,
+      interval_miles: interval === "auto" ? null : Number(interval),
+      demo_weather: true,
     });
     if (compact) setOpen(false);
   }
@@ -69,12 +91,15 @@ export default function RouteForm({ loading, compact, onSubmit }: Props) {
             <button
               type="button"
               onClick={() => {
-                setOrigin("Cheyenne, WY");
-                setDestination("Denver, CO");
-                setWeight("41000");
+                setOrigin("Denver, CO");
+                setDestination("Chicago, IL");
+                setWeight("35000");
               }}
             >
-              High plains · 41k lb
+              Denver → Chicago
+            </button>
+            <button type="button" className="demo-wind" onClick={runHighWindDemo} disabled={loading}>
+              Demo: High / Severe wind
             </button>
           </div>
           <div className="form-grid">

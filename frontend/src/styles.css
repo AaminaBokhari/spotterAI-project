@@ -345,6 +345,22 @@ select {
   cursor: pointer;
 }
 
+.demo-presets button.demo-wind {
+  border-color: rgba(255, 106, 42, 0.55);
+  color: var(--accent);
+}
+
+.demo-banner {
+  margin: 0;
+  padding: 0.65rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(255, 106, 42, 0.12);
+  border: 1px solid rgba(255, 106, 42, 0.4);
+  color: #ffd7c2;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr;

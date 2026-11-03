@@ -4,6 +4,7 @@ import requests
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .services.demo import apply_demo_high_wind
 from .services.geocode import geocode
 from .services.heatmap import build_heatmap
 from .services.recommend import recommend_route
@@ -47,6 +48,7 @@ def _parse_request(data):
         "departure": departure,
         "weight": weight,
         "interval": int(interval) if interval is not None else None,
+        "demo_weather": bool(data.get("demo_weather")),
     }, None
 
 
@@ -75,6 +77,8 @@ def analyze(request):
                 if parsed["interval"] is not None
                 else (10 if route["distance_miles"] < 100 else 25 if route["distance_miles"] < 400 else 50)
             )
+        if parsed["demo_weather"]:
+            apply_demo_high_wind(routes, parsed["weight"])
     except requests.RequestException as e:
         return Response(
             {"error": f"Weather service busy or unavailable — retry in a moment ({e})"},
@@ -90,6 +94,7 @@ def analyze(request):
             "departure_time": parsed["departure"].isoformat(),
             "routes": routes,
             "recommendation": recommendation,
+            "demo_weather": parsed["demo_weather"],
         }
     )
 

@@ -52,11 +52,17 @@ def via_point(origin: dict, dest: dict, sign: int = 1, offset_miles: float = 45.
     return lat, lng
 
 
+def _mid(route: dict) -> tuple[float, float]:
+    coords = route.get("coordinates") or []
+    if not coords:
+        return (0.0, 0.0)
+    lng, lat = coords[len(coords) // 2]
+    return (round(float(lng), 2), round(float(lat), 2))
+
+
 def _too_similar(a: dict, b: dict) -> bool:
-    return (
-        abs(a["distance_miles"] - b["distance_miles"]) < 8
-        and abs(a["duration_hours"] - b["duration_hours"]) < 0.25
-    )
+    """Same corridor if midpoints match. Length-alone is not enough — via routes can be similar miles."""
+    return _mid(a) == _mid(b)
 
 
 def get_routes(origin: dict, dest: dict) -> list[dict]:

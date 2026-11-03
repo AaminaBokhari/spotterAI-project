@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase
 
 from routing.services.geocode import geocode
+from routing.services.demo import apply_demo_high_wind
 from routing.services.routes import via_point, _too_similar
 from routing.services.recommend import recommend_route
 from routing.services.risk import (
@@ -137,7 +138,34 @@ class RoutePadTests(SimpleTestCase):
         mid_lng = (origin["lng"] + dest["lng"]) / 2
         self.assertGreater(abs(lat - mid_lat) + abs(lng - mid_lng), 0.2)
 
-    def test_similar_routes_detected(self):
-        a = {"distance_miles": 280, "duration_hours": 5.3}
-        b = {"distance_miles": 281, "duration_hours": 5.35}
+    def test_similar_routes_use_midpoint(self):
+        a = {"coordinates": [[-87.6, 41.8], [-85.0, 42.0], [-83.0, 42.3]]}
+        b = {"coordinates": [[-87.6, 41.8], [-85.0, 42.0], [-83.0, 42.3]]}
+        c = {"coordinates": [[-87.6, 41.8], [-86.2, 41.2], [-83.0, 42.3]]}
         self.assertTrue(_too_similar(a, b))
+        self.assertFalse(_too_similar(a, c))
+
+
+class DemoWindTests(SimpleTestCase):
+    def test_heavy_load_makes_40mph_severe(self):
+        routes = [
+            {
+                "checkpoints": [
+                    {"segment_miles": 50, "rain_in_hr": 0, "snow_in_hr": 0, "risk": "Low"}
+                ]
+            },
+            {
+                "checkpoints": [
+                    {"segment_miles": 50, "rain_in_hr": 0, "snow_in_hr": 0, "risk": "Low"}
+                ]
+            },
+            {
+                "checkpoints": [
+                    {"segment_miles": 50, "rain_in_hr": 0, "snow_in_hr": 0, "risk": "Low"}
+                ]
+            },
+        ]
+        apply_demo_high_wind(routes, 41_000)
+        self.assertEqual(routes[0]["checkpoints"][0]["risk"], "Moderate")
+        self.assertEqual(routes[1]["checkpoints"][0]["risk"], "Severe")
+        self.assertEqual(routes[2]["checkpoints"][0]["risk"], "No Travel")
