@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase
 
 from routing.services.geocode import geocode
+from routing.services.routes import via_point, _too_similar
 from routing.services.recommend import recommend_route
 from routing.services.risk import (
     apply_load_rules,
@@ -125,3 +126,18 @@ class GeocodeTests(SimpleTestCase):
     def test_lat_lng(self):
         p = geocode("41.88, -87.63")
         self.assertAlmostEqual(p["lat"], 41.88, places=2)
+
+
+class RoutePadTests(SimpleTestCase):
+    def test_via_is_off_the_direct_line(self):
+        origin = {"lat": 41.88, "lng": -87.63}
+        dest = {"lat": 42.33, "lng": -83.05}
+        lat, lng = via_point(origin, dest, sign=1, offset_miles=40)
+        mid_lat = (origin["lat"] + dest["lat"]) / 2
+        mid_lng = (origin["lng"] + dest["lng"]) / 2
+        self.assertGreater(abs(lat - mid_lat) + abs(lng - mid_lng), 0.2)
+
+    def test_similar_routes_detected(self):
+        a = {"distance_miles": 280, "duration_hours": 5.3}
+        b = {"distance_miles": 281, "duration_hours": 5.35}
+        self.assertTrue(_too_similar(a, b))

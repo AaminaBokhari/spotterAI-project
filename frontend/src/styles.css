@@ -328,6 +328,23 @@ select {
   font-size: 0.95rem;
 }
 
+.demo-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.demo-presets button {
+  border: 1px solid var(--line);
+  background: #0a0a0b;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr;

@@ -55,6 +55,28 @@ export default function RouteForm({ loading, compact, onSubmit }: Props) {
 
       {!collapsed && (
         <>
+          <div className="demo-presets">
+            <button
+              type="button"
+              onClick={() => {
+                setOrigin("Chicago, IL");
+                setDestination("Detroit, MI");
+                setWeight("35000");
+              }}
+            >
+              Chicago → Detroit
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOrigin("Cheyenne, WY");
+                setDestination("Denver, CO");
+                setWeight("41000");
+              }}
+            >
+              High plains · 41k lb
+            </button>
+          </div>
           <div className="form-grid">
             <label>
               Origin

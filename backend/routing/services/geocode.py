@@ -44,6 +44,16 @@ _KNOWN: dict[str, dict] = {
     "st louis mo": {"name": "St. Louis, Missouri, USA", "lat": 38.6270, "lng": -90.1994},
     "milwaukee": {"name": "Milwaukee, Wisconsin, USA", "lat": 43.0389, "lng": -87.9065},
     "milwaukee wi": {"name": "Milwaukee, Wisconsin, USA", "lat": 43.0389, "lng": -87.9065},
+    "cheyenne": {"name": "Cheyenne, Wyoming, USA", "lat": 41.1400, "lng": -104.8202},
+    "cheyenne wy": {"name": "Cheyenne, Wyoming, USA", "lat": 41.1400, "lng": -104.8202},
+    "cheyenne wyoming": {"name": "Cheyenne, Wyoming, USA", "lat": 41.1400, "lng": -104.8202},
+    "denver": {"name": "Denver, Colorado, USA", "lat": 39.7392, "lng": -104.9903},
+    "denver co": {"name": "Denver, Colorado, USA", "lat": 39.7392, "lng": -104.9903},
+    "denver colorado": {"name": "Denver, Colorado, USA", "lat": 39.7392, "lng": -104.9903},
+    "amarillo": {"name": "Amarillo, Texas, USA", "lat": 35.2220, "lng": -101.8313},
+    "amarillo tx": {"name": "Amarillo, Texas, USA", "lat": 35.2220, "lng": -101.8313},
+    "oklahoma city": {"name": "Oklahoma City, Oklahoma, USA", "lat": 35.4676, "lng": -97.5164},
+    "oklahoma city ok": {"name": "Oklahoma City, Oklahoma, USA", "lat": 35.4676, "lng": -97.5164},
 }
 
 
